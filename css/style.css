@@ -12,6 +12,12 @@
     --personal-color: #50e3c2;   /* Hijau */
     --sleep-color: #9013fe;      /* Ungu */
     --untracked-color: #d0d0d0;
+    
+    /* Warna untuk Chart */
+    --productive-chart-bg: rgba(74, 144, 226, 0.7);
+    --personal-chart-bg: rgba(80, 227, 194, 0.7);
+    --sleep-chart-bg: rgba(144, 19, 254, 0.7);
+    --untracked-chart-bg: rgba(208, 208, 208, 0.7);
 }
 
 /* --- Dark Mode --- */
@@ -21,6 +27,11 @@ body.dark-mode {
     --card-bg: #2d2d2d;
     --border-color: #444;
     --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    
+    --productive-chart-bg: rgba(74, 144, 226, 0.5);
+    --personal-chart-bg: rgba(80, 227, 194, 0.5);
+    --sleep-chart-bg: rgba(144, 19, 254, 0.5);
+    --untracked-chart-bg: rgba(208, 208, 208, 0.5);
 }
 
 * {
@@ -380,6 +391,43 @@ body.dark-mode .guest-warning {
     background: var(--productive-color); /* Will be set by JS */
     color: #fff;
 }
+
+/* ------------------------- */
+/* --- TOAST NOTIFICATION --- */
+/* ------------------------- */
+.toast {
+    visibility: hidden;
+    min-width: 250px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 8px;
+    padding: 1rem;
+    position: fixed;
+    z-index: 1002;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%);
+    font-size: 1rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+/* Animasi untuk memunculkan toast */
+.toast.show {
+    visibility: visible;
+    animation: fadein 0.5s, fadeout 0.5s 2.5s;
+}
+
+@keyframes fadein {
+    from {bottom: 0; opacity: 0;}
+    to {bottom: 30px; opacity: 1;}
+}
+
+@keyframes fadeout {
+    from {bottom: 30px; opacity: 1;}
+    to {bottom: 0; opacity: 0;}
+}
+
 
 /* ------------------------- */
 /* --- RESPONSIVE --- */
