@@ -23,7 +23,203 @@
     <!-- Firebase Firestore -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-    
+    <script>
+    // ====== CONFIG: ganti dengan config dari Firebase Console ======
+    const firebaseConfig = {
+    apiKey: "AIzaSyCVXoePE_K0BxmKuYUh4gDCFenxV6tF7kg",
+    authDomain: "eightify-ea45f.firebaseapp.com",
+    projectId: "eightify-ea45f",
+    storageBucket: "eightify-ea45f.firebasestorage.app",
+    messagingSenderId: "827591118188",
+    appId: "1:827591118188:web:de855d05c512af745ef749",
+    measurementId: "G-N48L4C268V"
+    };
+
+    // Inisialisasi
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const firestore = firebase.firestore();
+
+    // UI: tambahkan tombol di navbar (contoh sederhana)
+    const navRight = document.querySelector('nav .flex.items-center') || document.querySelector('nav div:last-child');
+    if (navRight) {
+        const loginBtn = document.createElement('button');
+        loginBtn.id = 'login-btn';
+        loginBtn.className = 'ml-4 bg-white border px-3 py-1 rounded';
+        loginBtn.textContent = 'Login';
+        navRight.appendChild(loginBtn);
+
+        const logoutBtn = document.createElement('button');
+        logoutBtn.id = 'logout-btn';
+        logoutBtn.className = 'ml-2 bg-white border px-3 py-1 rounded hidden';
+        logoutBtn.textContent = 'Logout';
+        navRight.appendChild(logoutBtn);
+    }
+
+    // Sign in with Google (popup)
+    async function signInWithGoogle() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        try {
+        await auth.signInWithPopup(provider);
+        // setelah login, onAuthStateChanged akan otomatis memanggil loadUserData
+        } catch (err) {
+        console.error('Login error', err);
+        alert('Gagal login: ' + err.message);
+        }
+    }
+
+    function signOut() {
+        auth.signOut();
+    }
+
+    // Simpan db lokal (object db di file kamu) ke Firestore pada doc users/{uid}
+    async function saveUserDBToFirestore(uid, dbObject) {
+        if (!uid) return;
+        try {
+        await firestore.collection('users').doc(uid).set({
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            data: dbObject
+        }, { merge: true });
+        console.log('Saved to Firestore');
+        } catch (e) {
+        console.error('Save error', e);
+        }
+    }
+
+    // Ambil db user dari Firestore; kembalikan null bila tidak ada
+    async function loadUserDBFromFirestore(uid) {
+        if (!uid) return null;
+        try {
+        const doc = await firestore.collection('users').doc(uid).get();
+        if (doc.exists) return doc.data().data || null;
+        return null;
+        } catch (e) {
+        console.error('Load error', e);
+        return null;
+        }
+    }
+
+    // Dengarkan perubahan auth state
+    auth.onAuthStateChanged(async (user) => {
+        const loginBtnEl = document.getElementById('login-btn');
+        const logoutBtnEl = document.getElementById('logout-btn');
+
+        if (user) {
+        // Update UI
+        if (loginBtnEl) loginBtnEl.classList.add('hidden');
+        if (logoutBtnEl) logoutBtnEl.classList.remove('hidden');
+
+        // muat data user dari Firestore (jika ada), gabungkan ke db lokal
+        const remote = await loadUserDBFromFirestore(user.uid);
+        if (remote) {
+            // Ganti proses loadDatabase supaya menggunakan remote jika ada
+            db = remote;
+            console.log('Loaded remote DB for', user.email);
+            saveDatabase(); // juga keep local copy
+            // render ulang UI jika perlu
+            renderDashboard();
+            renderInsightPage();
+        } else {
+            // bila belum ada remote, push local db ke Firestore
+            await saveUserDBToFirestore(user.uid, db);
+        }
+        } else {
+        // user signed out
+        if (loginBtnEl) loginBtnEl.classList.remove('hidden');
+        if (logoutBtnEl) logoutBtnEl.classList.add('hidden');
+        // tetap gunakan db dari localStorage (fallback)
+        }
+    });
+
+    // Hook tombol
+    document.addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'login-btn') signInWithGoogle();
+        if (e.target && e.target.id === 'logout-btn') signOut();
+    });
+
+    // Override saveDatabase() dan loadDatabase() agar sync otomatis bila user logged in
+    const originalSaveDatabase = window.saveDatabase || function(){ localStorage.setItem('eightifyDB', JSON.stringify(db)); };
+    window.saveDatabase = async function() {
+        // simpan ke localStorage dulu
+        localStorage.setItem('eightifyDB', JSON.stringify(db));
+        // jika ada user login, simpan ke Firestore
+        const u = auth.currentUser;
+        if (u) {
+        await saveUserDBToFirestore(u.uid, db);
+        }
+    };
+
+    const originalLoadDatabase = window.loadDatabase || function(){ /* original implementation */ };
+    window.loadDatabase = async function() {
+        // panggil implementasi original dulu (yang pake localStorage)
+        const defaultDB = {
+        firstTime: true,
+        categories: [
+            { id: 1, name: 'Tidur', icon: '😴', target: 8, protected: true },
+            { id: 2, name: 'Kerja', icon: '💼', target: 8, protected: true },
+            { id: 3, name: 'Pribadi', icon: '💛', target: 8, protected: true }
+        ],
+        logs: [],
+        currentTimer: null
+        };
+        // baca local
+        const local = JSON.parse(localStorage.getItem('eightifyDB')) || defaultDB;
+        db = local;
+
+        // jika user login, timpa dengan remote (jika ada)
+        const u = auth.currentUser;
+        if (u) {
+        const remote = await loadUserDBFromFirestore(u.uid);
+        if (remote) {
+            db = remote;
+        } else {
+            // kalau belum ada remote, kirim local ke remote
+            await saveUserDBToFirestore(u.uid, db);
+        }
+        }
+        return db;
+    };
+
+    async function signInWithGoogle() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        try {
+            await auth.signInWithPopup(provider);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function signOutGoogle() {
+        auth.signOut();
+    }
+
+    document.getElementById("login-btn").addEventListener("click", () => {
+        signInWithGoogle();
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", () => {
+        signOutGoogle();
+    });
+
+    auth.onAuthStateChanged(user => {
+        const loginBtn = document.getElementById("login-btn");
+        const logoutBtn = document.getElementById("logout-btn");
+        const profilePhoto = document.getElementById("profile-photo");
+
+        if (user) {
+            // User logged in
+            loginBtn.classList.add("hidden");
+            logoutBtn.classList.remove("hidden");
+            profilePhoto.src = user.photoURL || "https://ui-avatars.com/api/?name=" + user.displayName;
+        } else {
+            // User logged out
+            loginBtn.classList.remove("hidden");
+            logoutBtn.classList.add("hidden");
+            profilePhoto.src = "https://ui-avatars.com/api/?name=?";
+        }
+    });
+
+    </script>
 
     <script>
         // Konfigurasi Tailwind untuk menggunakan font Inter
@@ -155,6 +351,20 @@
                         <button class="nav-link text-gray-500 hover:text-brand-blue-500 font-medium py-5 transition duration-150" data-page="dashboard">Dashboard</button>
                         <button class="nav-link text-gray-500 hover:text-brand-blue-500 font-medium py-5 transition duration-150" data-page="statistik">Statistik</button>
                         <button class="nav-link text-gray-500 hover:text-brand-blue-500 font-medium py-5 transition duration-150" data-page="insight">Insight</button>
+                        <div class="relative">
+                            <img id="profile-photo" 
+                                src="https://ui-avatars.com/api/?name=?" 
+                                class="w-10 h-10 rounded-full cursor-pointer border"
+                            >
+                            
+                            <!-- DROPDOWN -->
+                            <div id="profile-dropdown" 
+                                class="hidden absolute right-0 mt-2 w-48 bg-white shadow-lg rounded-lg py-2 z-50">
+                                <button id="login-btn" class="w-full text-left px-4 py-2 hover:bg-gray-100">Login with Google</button>
+                                <button id="logout-btn" class="hidden w-full text-left px-4 py-2 hover:bg-gray-100">Logout</button>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -424,6 +634,21 @@
                     });
                 });
             }
+
+            // Dropdown logic
+            const profilePhoto = document.getElementById("profile-photo");
+            const dropdown = document.getElementById("profile-dropdown");
+
+            profilePhoto.addEventListener("click", () => {
+                dropdown.classList.toggle("hidden");
+            });
+
+            document.addEventListener("click", (e) => {
+                if (!profilePhoto.contains(e.target) && !dropdown.contains(e.target)) {
+                    dropdown.classList.add("hidden");
+                }
+            });
+
 
             function showPage(pageId) {
                 // Sembunyikan semua halaman
