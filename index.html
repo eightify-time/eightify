@@ -1,21 +1,17 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Eightify - 8-8-8 Time Management</title>
-    
-    <!-- Memuat Tailwind CSS -->
+
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Memuat Chart.js untuk grafik -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <!-- Memuat Font Inter -->
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <!-- Firebase App (core) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <!-- Firebase Auth -->
@@ -23,305 +19,57 @@
     <!-- Firebase Firestore -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-    <script>
-    // ====== CONFIG: ganti dengan config dari Firebase Console ======
-    const firebaseConfig = {
-    apiKey: "AIzaSyCVXoePE_K0BxmKuYUh4gDCFenxV6tF7kg",
-    authDomain: "eightify-ea45f.firebaseapp.com",
-    projectId: "eightify-ea45f",
-    storageBucket: "eightify-ea45f.firebasestorage.app",
-    messagingSenderId: "827591118188",
-    appId: "1:827591118188:web:de855d05c512af745ef749",
-    measurementId: "G-N48L4C268V"
-    };
-
-    // Inisialisasi
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const firestore = firebase.firestore();
-
-    // UI: tambahkan tombol di navbar (contoh sederhana)
-    const navRight = document.querySelector('nav .flex.items-center') || document.querySelector('nav div:last-child');
-    if (navRight) {
-        const loginBtn = document.createElement('button');
-        loginBtn.id = 'login-btn';
-        loginBtn.className = 'ml-4 bg-white border px-3 py-1 rounded';
-        loginBtn.textContent = 'Login';
-        navRight.appendChild(loginBtn);
-
-        const logoutBtn = document.createElement('button');
-        logoutBtn.id = 'logout-btn';
-        logoutBtn.className = 'ml-2 bg-white border px-3 py-1 rounded hidden';
-        logoutBtn.textContent = 'Logout';
-        navRight.appendChild(logoutBtn);
-    }
-
-    // Sign in with Google (popup)
-    async function signInWithGoogle() {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        try {
-        await auth.signInWithPopup(provider);
-        // setelah login, onAuthStateChanged akan otomatis memanggil loadUserData
-        } catch (err) {
-        console.error('Login error', err);
-        alert('Gagal login: ' + err.message);
-        }
-    }
-
-    function signOut() {
-        auth.signOut();
-    }
-
-    // Simpan db lokal (object db di file kamu) ke Firestore pada doc users/{uid}
-    async function saveUserDBToFirestore(uid, dbObject) {
-        if (!uid) return;
-        try {
-        await firestore.collection('users').doc(uid).set({
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            data: dbObject
-        }, { merge: true });
-        console.log('Saved to Firestore');
-        } catch (e) {
-        console.error('Save error', e);
-        }
-    }
-
-    // Ambil db user dari Firestore; kembalikan null bila tidak ada
-    async function loadUserDBFromFirestore(uid) {
-        if (!uid) return null;
-        try {
-        const doc = await firestore.collection('users').doc(uid).get();
-        if (doc.exists) return doc.data().data || null;
-        return null;
-        } catch (e) {
-        console.error('Load error', e);
-        return null;
-        }
-    }
-
-    // Dengarkan perubahan auth state
-    auth.onAuthStateChanged(async (user) => {
-        const loginBtnEl = document.getElementById('login-btn');
-        const logoutBtnEl = document.getElementById('logout-btn');
-
-        if (user) {
-        // Update UI
-        if (loginBtnEl) loginBtnEl.classList.add('hidden');
-        if (logoutBtnEl) logoutBtnEl.classList.remove('hidden');
-
-        // muat data user dari Firestore (jika ada), gabungkan ke db lokal
-        const remote = await loadUserDBFromFirestore(user.uid);
-        if (remote) {
-            // Ganti proses loadDatabase supaya menggunakan remote jika ada
-            db = remote;
-            console.log('Loaded remote DB for', user.email);
-            saveDatabase(); // juga keep local copy
-            // render ulang UI jika perlu
-            renderDashboard();
-            renderInsightPage();
-        } else {
-            // bila belum ada remote, push local db ke Firestore
-            await saveUserDBToFirestore(user.uid, db);
-        }
-        } else {
-        // user signed out
-        if (loginBtnEl) loginBtnEl.classList.remove('hidden');
-        if (logoutBtnEl) logoutBtnEl.classList.add('hidden');
-        // tetap gunakan db dari localStorage (fallback)
-        }
-    });
-
-    // Hook tombol
-    document.addEventListener('click', (e) => {
-        if (e.target && e.target.id === 'login-btn') signInWithGoogle();
-        if (e.target && e.target.id === 'logout-btn') signOut();
-    });
-
-    // Override saveDatabase() dan loadDatabase() agar sync otomatis bila user logged in
-    const originalSaveDatabase = window.saveDatabase || function(){ localStorage.setItem('eightifyDB', JSON.stringify(db)); };
-    window.saveDatabase = async function() {
-        // simpan ke localStorage dulu
-        localStorage.setItem('eightifyDB', JSON.stringify(db));
-        // jika ada user login, simpan ke Firestore
-        const u = auth.currentUser;
-        if (u) {
-        await saveUserDBToFirestore(u.uid, db);
-        }
-    };
-
-    const originalLoadDatabase = window.loadDatabase || function(){ /* original implementation */ };
-    window.loadDatabase = async function() {
-        // panggil implementasi original dulu (yang pake localStorage)
-        const defaultDB = {
-        firstTime: true,
-        categories: [
-            { id: 1, name: 'Tidur', icon: '😴', target: 8, protected: true },
-            { id: 2, name: 'Kerja', icon: '💼', target: 8, protected: true },
-            { id: 3, name: 'Pribadi', icon: '💛', target: 8, protected: true }
-        ],
-        logs: [],
-        currentTimer: null
-        };
-        // baca local
-        const local = JSON.parse(localStorage.getItem('eightifyDB')) || defaultDB;
-        db = local;
-
-        // jika user login, timpa dengan remote (jika ada)
-        const u = auth.currentUser;
-        if (u) {
-        const remote = await loadUserDBFromFirestore(u.uid);
-        if (remote) {
-            db = remote;
-        } else {
-            // kalau belum ada remote, kirim local ke remote
-            await saveUserDBToFirestore(u.uid, db);
-        }
-        }
-        return db;
-    };
-
-    async function signInWithGoogle() {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        try {
-            await auth.signInWithPopup(provider);
-        } catch (e) {
-            console.error(e);
-        }
-    }
-
-    function signOutGoogle() {
-        auth.signOut();
-    }
-
-    document.getElementById("login-btn").addEventListener("click", () => {
-        signInWithGoogle();
-    });
-
-    document.getElementById("logout-btn").addEventListener("click", () => {
-        signOutGoogle();
-    });
-
-    auth.onAuthStateChanged(user => {
-        const loginBtn = document.getElementById("login-btn");
-        const logoutBtn = document.getElementById("logout-btn");
-        const profilePhoto = document.getElementById("profile-photo");
-
-        if (user) {
-            // User logged in
-            loginBtn.classList.add("hidden");
-            logoutBtn.classList.remove("hidden");
-            profilePhoto.src = user.photoURL || "https://ui-avatars.com/api/?name=" + user.displayName;
-        } else {
-            // User logged out
-            loginBtn.classList.remove("hidden");
-            logoutBtn.classList.add("hidden");
-            profilePhoto.src = "https://ui-avatars.com/api/?name=?";
-        }
-    });
-
-    </script>
-
-    <script>
-        // Konfigurasi Tailwind untuk menggunakan font Inter
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        'brand-blue': {
-                            100: '#E0F2FE',
-                            500: '#0EA5E9',
-                            600: '#0284C7',
-                        },
-                        'brand-yellow': '#FACC15',
-                        'brand-gray': '#6B7280',
-                    }
-                }
-            }
-        }
-    </script>
-    
     <style>
-        /* CSS tambahan untuk transisi dan elemen kustom */
-        body {
-            font-family: 'Inter', sans-serif;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-        
-        .page-content {
-            display: none; /* Disembunyikan, diatur oleh JS */
-        }
-        
-        .nav-link.active {
-            border-bottom-width: 2px;
-            border-color: #0EA5E9; /* brand-blue-500 */
-            color: #0EA5E9;
-        }
-        
-        /* Animasi untuk modal */
-        .modal {
-            transition: opacity 0.25s ease, transform 0.25s ease;
-        }
-        .modal-content {
-            transition: transform 0.25s ease;
-        }
-        
-        /* CSS untuk Progress Wheel */
-        .progress-ring__circle {
-            transition: stroke-dashoffset 0.35s;
-            transform: rotate(-90deg);
-            transform-origin: 50% 50%;
-        }
-
-        /* Tampilan onboarding slide */
-        .slide {
-            display: none; /* Sembunyikan semua slide by default */
-        }
-        .slide.active {
-            display: block; /* Tampilkan slide yang aktif */
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        .page-content { display: none; }
+        .nav-link.active { border-bottom-width: 2px; border-color: #0EA5E9; color: #0EA5E9; }
+        .modal { transition: opacity 0.25s ease, transform 0.25s ease; }
+        .modal-content { transition: transform 0.25s ease; }
+        .progress-ring__circle { transition: stroke-dashoffset 0.35s; transform: rotate(-90deg); transform-origin: 50% 50%; }
+        .slide { display: none; } .slide.active { display: block; }
+        /* responsive tweaks */
+        @media (max-width: 640px) {
+            nav .nav-link { display: none; } /* hide text nav on small screens */
         }
     </style>
+
+    <script>
+      // ====== FIREBASE CONFIG - GANTI DENGAN MILIKMU ======
+      const firebaseConfig = {
+        apiKey: "GANTI_API_KEY",
+        authDomain: "GANTI_PROJECT.firebaseapp.com",
+        projectId: "GANTI_PROJECT",
+        // ... tambahkan field lain (storageBucket, messagingSenderId, appId) jika ada
+      };
+      // ===================================================
+      firebase.initializeApp(firebaseConfig);
+      const auth = firebase.auth();
+      const firestore = firebase.firestore();
+
+      // Pastikan persistence lokal (tetap login setelah tutup browser)
+      auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(console.error);
+    </script>
 </head>
 <body class="bg-sky-50 text-gray-800">
 
-    <!-- 
-      ============================================
-      ONBOARDING PAGE
-      ============================================
-    -->
+    <!-- ONBOARDING -->
     <div id="onboarding-page" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center p-6 text-center">
         <div class="max-w-md w-full">
-            
-            <!-- Slide Container -->
             <div class="relative h-64">
-                <!-- Slide 1 -->
                 <div class="slide active absolute inset-0 transition-opacity duration-500 ease-in-out">
                     <h2 class="text-3xl font-bold text-brand-blue-600 mb-4">Selamat Datang di Eightify 🧠</h2>
                     <p class="text-lg text-gray-600">Hidup seimbang bukan impian. Mari kita ukur dan capai bersama.</p>
                 </div>
-                
-                <!-- Slide 2 -->
                 <div class="slide absolute inset-0 transition-opacity duration-500 ease-in-out">
                     <h2 class="text-3xl font-bold text-gray-800 mb-4">Apa itu Prinsip 8-8-8?</h2>
-                    <p class="text-lg text-gray-600"><span class="font-semibold">8 jam Tidur 😴</span> untuk istirahat.</p>
-                    <p class="text-lg text-gray-600"><span class="font-semibold">8 jam Kerja 💼</span> untuk produktif.</p>
-                    <p class="text-lg text-gray-600"><span class="font-semibold">8 jam Pribadi 💛</span> untuk hidupmu.</p>
+                    <p class="text-lg text-gray-600"><span class="font-semibold">8 jam Tidur 😴</span></p>
                 </div>
-                
-                <!-- Slide 3 -->
                 <div class="slide absolute inset-0 transition-opacity duration-500 ease-in-out">
                     <h2 class="text-3xl font-bold text-gray-800 mb-4">Siap Memulai?</h2>
-                    <p class="text-lg text-gray-600 mb-8">Mulailah melacak aktivitas Anda hari ini dan lihat perbedaannya.</p>
-                    <button id="start-balance-btn" class="bg-brand-blue-500 hover:bg-brand-blue-600 text-white font-bold py-3 px-6 rounded-lg text-lg shadow-lg transition duration-300">
-                        Start Your Balance
-                    </button>
+                    <p class="text-lg text-gray-600 mb-8">Mulailah melacak aktivitas Anda hari ini.</p>
+                    <button id="start-balance-btn" class="bg-brand-blue-500 hover:bg-brand-blue-600 text-white font-bold py-3 px-6 rounded-lg text-lg shadow-lg transition duration-300">Start Your Balance</button>
                 </div>
             </div>
-
-            <!-- Navigasi Slide -->
             <div class="flex justify-center items-center mt-8">
                 <button id="prev-slide-btn" class="text-gray-400 hover:text-brand-blue-500 px-4 py-2 rounded-lg transition">&larr; Kembali</button>
                 <div class="flex space-x-2 mx-4">
@@ -334,139 +82,112 @@
         </div>
     </div>
 
-    <!-- 
-      ============================================
-      MAIN APP CONTAINER (Awalnya disembunyikan)
-      ============================================
-    -->
+    <!-- APP -->
     <div id="app-container" class="hidden min-h-screen">
-        <!-- Navbar -->
         <nav class="bg-white shadow-sm sticky top-0 z-30">
             <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16">
-                    <div class="flex-shrink-0 flex items-center">
+                <div class="flex justify-between h-16 items-center">
+                    <div class="flex items-center space-x-4">
                         <h1 class="text-2xl font-bold text-brand-blue-600">🧠 Eightify</h1>
+                        <div class="hidden sm:flex items-center space-x-6">
+                            <button class="nav-link text-gray-500 hover:text-brand-blue-500 font-medium py-5 transition duration-150" data-page="dashboard">Dashboard</button>
+                            <button class="nav-link text-gray-500 hover:text-brand-blue-500 font-medium py-5 transition duration-150" data-page="statistik">Statistik</button>
+                            <button class="nav-link text-gray-500 hover:text-brand-blue-500 font-medium py-5 transition duration-150" data-page="insight">Insight</button>
+                        </div>
                     </div>
-                    <div class="flex items-center space-x-8">
-                        <button class="nav-link text-gray-500 hover:text-brand-blue-500 font-medium py-5 transition duration-150" data-page="dashboard">Dashboard</button>
-                        <button class="nav-link text-gray-500 hover:text-brand-blue-500 font-medium py-5 transition duration-150" data-page="statistik">Statistik</button>
-                        <button class="nav-link text-gray-500 hover:text-brand-blue-500 font-medium py-5 transition duration-150" data-page="insight">Insight</button>
+
+                    <div class="flex items-center space-x-4">
+                        <!-- small screen nav toggle could be added later -->
+                        <!-- PROFILE & DROPDOWN -->
                         <div class="relative">
-                            <img id="profile-photo" 
-                                src="https://ui-avatars.com/api/?name=?" 
-                                class="w-10 h-10 rounded-full cursor-pointer border"
-                            >
-                            
-                            <!-- DROPDOWN -->
-                            <div id="profile-dropdown" 
-                                class="hidden absolute right-0 mt-2 w-48 bg-white shadow-lg rounded-lg py-2 z-50">
-                                <button id="login-btn" class="w-full text-left px-4 py-2 hover:bg-gray-100">Login with Google</button>
-                                <button id="logout-btn" class="hidden w-full text-left px-4 py-2 hover:bg-gray-100">Logout</button>
+                            <img id="profile-photo" src="https://api.dicebear.com/6.x/thumbs/svg?seed=avatar1" class="w-10 h-10 rounded-full cursor-pointer border" alt="profile">
+                            <div id="profile-dropdown" class="hidden absolute right-0 mt-2 w-52 bg-white shadow-lg rounded-lg py-2 z-50">
+                                <div class="px-4 py-2 text-sm text-gray-700" id="profile-name">Not signed in</div>
+                                <hr>
+                                <button id="choose-avatar-btn" class="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Ganti avatar</button>
+                                <button id="login-btn" class="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Login with Google</button>
+                                <button id="logout-btn" class="hidden w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">Logout</button>
                             </div>
                         </div>
-
                     </div>
+
                 </div>
             </div>
         </nav>
 
-        <!-- Main Content Area -->
         <main class="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
-
-            <!-- 
-              ============================================
-              DASHBOARD PAGE
-              ============================================
-            -->
             <div id="dashboard-page" class="page-content">
                 <div class="text-center mb-10">
-                    <!-- Progress Wheel -->
-                    <div class="relative w-64 h-64 mx-auto mb-4">
+                    <div class="relative w-48 h-48 mx-auto mb-4">
                         <svg class="w-full h-full" viewBox="0 0 100 100">
-                            <!-- Background Circle -->
                             <circle class="text-gray-200" stroke-width="10" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" />
-                            <!-- Progress Circle -->
-                            <circle id="progress-ring-circle" class="progress-ring__circle text-brand-blue-500"
-                                stroke-width="10"
-                                stroke-dasharray="282.74"
-                                stroke-dashoffset="282.74"
-                                stroke-linecap="round"
-                                stroke="currentColor"
-                                fill="transparent"
-                                r="45" cx="50" cy="50" />
+                            <circle id="progress-ring-circle" class="progress-ring__circle text-brand-blue-500" stroke-width="10" stroke-dasharray="282.74" stroke-dashoffset="282.74" stroke-linecap="round" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" />
                         </svg>
                         <div class="absolute inset-0 flex flex-col items-center justify-center">
-                            <span id="total-hours-text" class="text-4xl font-bold text-gray-800">0.0 jam</span>
-                            <span class="text-gray-500">Total Hari Ini</span>
+                            <span id="total-hours-text" class="text-2xl font-bold text-gray-800">0.0 jam</span>
+                            <span class="text-gray-500 text-sm">Total Hari Ini</span>
                         </div>
                     </div>
                     <p id="current-timer-display" class="text-lg text-gray-600 h-6"></p>
                 </div>
 
-                <!-- Kategori Grid -->
                 <h2 class="text-2xl font-semibold mb-4">Kategori Aktivitas</h2>
-                <div id="category-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    <!-- Kategori akan di-render oleh JS di sini -->
-                    
-                    <!-- Tombol Tambah Kategori (DIHAPUS) -->
+                <div id="category-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <!-- cards rendered by JS -->
+                    <button id="add-category-btn" class="category-card flex flex-col items-center justify-center bg-white p-6 rounded-lg shadow transition hover:scale-105">
+                        <span class="text-3xl mb-3">＋</span>
+                        <span class="font-semibold text-lg">Tambah</span>
+                    </button>
                 </div>
             </div>
 
-            <!-- 
-              ============================================
-              STATISTIK PAGE
-              ============================================
-            -->
             <div id="statistik-page" class="page-content">
                 <h2 class="text-2xl font-semibold mb-6">Statistik Penggunaan Waktu</h2>
-                
-                <!-- Filter Waktu -->
-                <div class="flex space-x-2 mb-6">
-                    <button class="stats-filter-btn bg-brand-blue-500 text-white px-4 py-2 rounded-lg font-medium" data-period="daily">Harian</button>
-                    <button class="stats-filter-btn bg-white text-gray-600 px-4 py-2 rounded-lg font-medium border" data-period="weekly">Mingguan</button>
-                    <button class="stats-filter-btn bg-white text-gray-600 px-4 py-2 rounded-lg font-medium border" data-period="monthly">Bulanan</button>
+
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                    <div class="flex space-x-2">
+                        <button class="stats-filter-btn bg-brand-blue-500 text-white px-4 py-2 rounded-lg font-medium" data-period="daily">Harian</button>
+                        <button class="stats-filter-btn bg-white text-gray-600 px-4 py-2 rounded-lg font-medium border" data-period="weekly">Mingguan</button>
+                        <button class="stats-filter-btn bg-white text-gray-600 px-4 py-2 rounded-lg font-medium border" data-period="monthly">Bulanan</button>
+                    </div>
                 </div>
 
-                <!-- Bar Chart -->
-                <div class="bg-white p-6 rounded-lg shadow mb-8">
-                    <canvas id="stats-chart" height="120"></canvas>
+                <div class="bg-white p-6 rounded-lg shadow mb-8 w-full sm:w-96 mx-auto">
+                    <canvas id="stats-chart" height="220"></canvas>
                 </div>
 
-                <!-- Target 8-8-8 -->
                 <h3 class="text-xl font-semibold mb-4">Perbandingan Target 8-8-8 (Hari Ini)</h3>
-                <div id="target-comparison" class="space-y-4">
-                    <!-- Akan di-render oleh JS -->
+                <div id="target-comparison" class="space-y-4"></div>
+
+                <div id="activity-log-section" class="mt-8">
+                    <h3 class="text-xl font-semibold mb-4">Detail Aktivitas (Hari Ini)</h3>
+                    <div id="activity-log-details" class="space-y-6"></div>
                 </div>
             </div>
 
-            <!-- 
-              ============================================
-              INSIGHT PAGE
-              ============================================
-            -->
             <div id="insight-page" class="page-content">
                 <h2 class="text-2xl font-semibold mb-6">Insight Harian</h2>
-                
                 <div class="bg-white p-8 rounded-lg shadow text-center">
                     <span class="text-5xl mb-4 inline-block">💡</span>
-                    <p id="insight-text" class="text-xl text-gray-700 leading-relaxed">
-                        <!-- Insight akan di-generate oleh JS -->
-                    </p>
+                    <p id="insight-text" class="text-xl text-gray-700 leading-relaxed"></p>
                 </div>
             </div>
 
         </main>
     </div>
 
-    <!-- 
-      ============================================
-      MODALS
-      ============================================
-    -->
+    <!-- Avatar chooser modal -->
+    <div id="avatar-modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4 hidden opacity-0 -translate-y-4">
+        <div class="modal-content bg-white rounded-lg shadow-xl p-6 w-full max-w-sm transition-transform transform scale-95">
+            <h3 class="text-xl font-semibold mb-4">Pilih Avatar</h3>
+            <div class="grid grid-cols-3 gap-3" id="avatar-options"></div>
+            <div class="flex justify-end mt-4">
+                <button id="close-avatar-modal" class="bg-gray-100 px-4 py-2 rounded">Tutup</button>
+            </div>
+        </div>
+    </div>
 
-    <!-- Modal Tambah Kategori (DIHAPUS) -->
-
-    <!-- (BARU) Modal Deskripsi Tugas -->
+    <!-- Task description modal -->
     <div id="task-description-modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4 hidden opacity-0 -translate-y-4">
         <div class="modal-content bg-white rounded-lg shadow-xl p-6 w-full max-w-sm transition-transform transform scale-95">
             <h3 class="text-xl font-semibold mb-4">Mulai Aktivitas</h3>
@@ -484,758 +205,462 @@
         </div>
     </div>
 
-    <!-- Modal Reminder -->
+    <!-- Reminder modal -->
     <div id="reminder-modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4 hidden opacity-0 -translate-y-4">
         <div class="modal-content bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center transition-transform transform scale-95">
             <span class="text-5xl mb-4 inline-block">🔔</span>
-            <p id="reminder-text" class="text-lg text-gray-700 mb-6">
-                <!-- Teks reminder diisi oleh JS -->
-            </p>
+            <p id="reminder-text" class="text-lg text-gray-700 mb-6"></p>
             <button type="button" class="btn-cancel-modal bg-brand-blue-500 text-white px-6 py-2 rounded-lg hover:bg-brand-blue-600 transition w-full">Mengerti</button>
         </div>
     </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // ===== STATE =====
+    let db; // local DB object
+    let currentTimerInterval;
+    let statsChartInstance;
+    let currentSlide = 0;
 
-    <!-- 
-      ============================================
-      JAVASCRIPT
-      ============================================
-    -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
+    // avatar seeds (5 options)
+    const avatarSeeds = ['avatar1','avatar2','avatar3','avatar4','avatar5'];
 
-            // ===================================
-            // SIB (STATE & Inisialisasi)
-            // ===================================
+    // ===== helpers =====
+    function defaultDB() {
+        return {
+            firstTime: true,
+            chosenAvatar: null,
+            categories: [
+                { id: 1, name: 'Tidur', icon: '😴', target: 8, protected: true },
+                { id: 2, name: 'Kerja', icon: '💼', target: 8, protected: true },
+                { id: 3, name: 'Pribadi', icon: '💛', target: 8, protected: true }
+            ],
+            logs: [],
+            currentTimer: null
+        };
+    }
 
-            let db; // Variabel database utama
-            let currentTimerInterval; // Untuk interval stopwatch
-            let statsChartInstance; // Untuk Chart.js
-            let currentSlide = 0; // Untuk onboarding
+    function loadDatabaseLocal() {
+        const local = JSON.parse(localStorage.getItem('eightifyDB'));
+        return local || defaultDB();
+    }
 
-            const slides = document.querySelectorAll('#onboarding-page .slide');
-            const dots = document.querySelectorAll('#onboarding-page .dot');
+    function saveDatabaseLocal() {
+        localStorage.setItem('eightifyDB', JSON.stringify(db));
+    }
 
-            // Fungsi untuk inisialisasi database dari localStorage
-            function loadDatabase() {
-                const defaultDB = {
-                    firstTime: true,
-                    categories: [
-                        { id: 1, name: 'Tidur', icon: '😴', target: 8, protected: true },
-                        { id: 2, name: 'Kerja', icon: '💼', target: 8, protected: true },
-                        { id: 3, name: 'Pribadi', icon: '💛', target: 8, protected: true }
-                    ],
-                    logs: [], // { categoryId: 1, startTime: timestamp, endTime: timestamp }
-                    currentTimer: null // { categoryId: 1, startTime: timestamp }
-                };
-                
-                db = JSON.parse(localStorage.getItem('eightifyDB')) || defaultDB;
-                
-                // Pastikan kategori default ada jika user lama
-                if (!db.categories.find(c => c.id === 1)) db.categories.unshift(defaultDB.categories[0]);
-                if (!db.categories.find(c => c.id === 2)) db.categories.unshift(defaultDB.categories[1]);
-                if (!db.categories.find(c => c.id === 3)) db.categories.unshift(defaultDB.categories[2]);
-            }
+    // ===== Firestore sync =====
+    async function saveUserDBToFirestore(uid) {
+        if (!uid) return;
+        try {
+            await firestore.collection('users').doc(uid).set({
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                data: db
+            }, { merge: true });
+            console.log('Saved user DB to Firestore');
+        } catch (e) {
+            console.error('saveUserDBToFirestore', e);
+        }
+    }
 
-            // Fungsi untuk menyimpan database ke localStorage
-            function saveDatabase() {
-                localStorage.setItem('eightifyDB', JSON.stringify(db));
-            }
+    async function loadUserDBFromFirestore(uid) {
+        if (!uid) return null;
+        try {
+            const doc = await firestore.collection('users').doc(uid).get();
+            if (doc.exists) return doc.data().data || null;
+            return null;
+        } catch (e) {
+            console.error('loadUserDBFromFirestore', e);
+            return null;
+        }
+    }
 
-            // Fungsi inisialisasi utama
-            function initializeApp() {
-                loadDatabase();
+    // ===== UI elements =====
+    const slides = document.querySelectorAll('#onboarding-page .slide');
+    const dots = document.querySelectorAll('#onboarding-page .dot');
 
-                if (db.firstTime) {
-                    document.getElementById('onboarding-page').style.display = 'flex';
-                    document.getElementById('app-container').style.display = 'none';
-                    updateOnboardingUI();
-                } else {
-                    document.getElementById('onboarding-page').style.display = 'none';
-                    document.getElementById('app-container').style.display = 'block';
-                    setupApp();
-                }
+    // ===== onboarding =====
+    function updateOnboardingUI() {
+        slides.forEach((slide, index) => {
+            slide.classList.toggle('active', index === currentSlide);
+            slide.style.opacity = index === currentSlide ? '1' : '0';
+        });
+        dots.forEach((dot, index) => dot.classList.toggle('bg-brand-blue-500', index === currentSlide));
+        document.getElementById('prev-slide-btn').style.visibility = currentSlide === 0 ? 'hidden' : 'visible';
+        document.getElementById('next-slide-btn').style.visibility = currentSlide === slides.length - 1 ? 'hidden' : 'visible';
+    }
+    document.getElementById('next-slide-btn').addEventListener('click', () => { if (currentSlide < slides.length -1) { currentSlide++; updateOnboardingUI(); }});
+    document.getElementById('prev-slide-btn').addEventListener('click', () => { if (currentSlide > 0) { currentSlide--; updateOnboardingUI(); }});
+    document.getElementById('start-balance-btn').addEventListener('click', () => {
+        db.firstTime = false; saveDatabaseLocal();
+        const onboardingPage = document.getElementById('onboarding-page');
+        onboardingPage.style.transition = 'opacity 0.5s ease'; onboardingPage.style.opacity = '0';
+        setTimeout(()=>{ onboardingPage.style.display='none'; document.getElementById('app-container').style.display='block'; setupApp(); }, 500);
+    });
 
-                setupOnboardingListeners();
-            }
+    // ===== NAV & PAGES =====
+    function setupNavListeners() {
+        document.querySelectorAll('.nav-link').forEach(link => link.addEventListener('click', (e) => showPage(e.target.dataset.page)));
+    }
+    function showPage(pageId) {
+        document.querySelectorAll('.page-content').forEach(page => page.style.display='none');
+        document.querySelectorAll('.nav-link').forEach(link => link.classList.toggle('active', link.dataset.page===pageId));
+        const pageToShow = document.getElementById(`${pageId}-page`);
+        if (pageToShow) pageToShow.style.display='block';
+        if (pageId==='dashboard') renderDashboard();
+        if (pageId==='statistik') renderStatsPage('daily');
+        if (pageId==='insight') renderInsightPage();
+    }
 
-            // Setup aplikasi setelah onboarding
-            function setupApp() {
-                setupNavListeners();
-                setupModalListeners();
-                setupStatsFilterListeners();
+    // ===== Modal helpers =====
+    function showModal(id) {
+        const modal = document.getElementById(id);
+        modal.classList.remove('hidden'); setTimeout(()=>{ modal.classList.remove('opacity-0','-translate-y-4'); modal.querySelector('.modal-content').classList.remove('scale-95'); },10);
+    }
+    function hideModal(id) {
+        const modal = document.getElementById(id);
+        modal.classList.add('opacity-0','-translate-y-4'); modal.querySelector('.modal-content').classList.add('scale-95');
+        setTimeout(()=> modal.classList.add('hidden'), 250);
+    }
+    document.querySelectorAll('.btn-cancel-modal').forEach(b => b.addEventListener('click', (e)=> hideModal(e.target.closest('.modal').id)));
+    document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', (e)=> { if (e.target===m) hideModal(m.id); }));
 
-                // (DIHAPUS) Listener untuk tambah kategori
-                
-                // (BARU) Event listener untuk modal deskripsi
-                document.getElementById('task-description-form').addEventListener('submit', handleStartTask);
+    // ===== Timer logic (unchanged) =====
+    function handleTimerToggle(categoryId) {
+        if (db.currentTimer && db.currentTimer.categoryId===categoryId) { stopCurrentTimer(); return; }
+        if (db.currentTimer) stopCurrentTimer();
+        if (categoryId===1) startTimer(categoryId, null); else showTaskDescriptionModal(categoryId);
+    }
+    function showTaskDescriptionModal(categoryId) {
+        document.getElementById('task-category-id').value = categoryId;
+        const category = db.categories.find(c=>c.id===categoryId);
+        document.getElementById('task-description').placeholder = category && category.id===2 ? 'Contoh: Rapat Proyek' : 'Contoh: Olahraga';
+        showModal('task-description-modal');
+        setTimeout(()=> document.getElementById('task-description').focus(),100);
+    }
+    document.getElementById('task-description-form').addEventListener('submit', (e)=>{
+        e.preventDefault();
+        const categoryId = parseInt(document.getElementById('task-category-id').value);
+        const description = document.getElementById('task-description').value || 'Tanpa Deskripsi';
+        startTimer(categoryId, description);
+        hideModal('task-description-modal');
+        document.getElementById('task-description-form').reset();
+    });
 
-                showPage('dashboard'); // Tampilkan dashboard sebagai default
-                startGlobalTimer(); // Mulai timer utama
-            }
-            
-            // ===================================
-            // ONBOARDING
-            // ===================================
-            
-            function updateOnboardingUI() {
-                slides.forEach((slide, index) => {
-                    slide.classList.toggle('active', index === currentSlide);
-                    slide.style.opacity = index === currentSlide ? '1' : '0';
-                });
-                dots.forEach((dot, index) => {
-                    dot.classList.toggle('bg-brand-blue-500', index === currentSlide);
-                    dot.classList.toggle('bg-gray-300', index !== currentSlide);
-                });
+    function startTimer(categoryId, description) {
+        if (db.currentTimer) stopCurrentTimer();
+        db.currentTimer = { categoryId, startTime: Date.now(), description: description || null };
+        saveAndSync();
+        renderDashboard();
+        startGlobalTimer();
+    }
+    function stopCurrentTimer() {
+        if (!db.currentTimer) return;
+        const entry = { categoryId: db.currentTimer.categoryId, startTime: db.currentTimer.startTime, endTime: Date.now(), description: db.currentTimer.description || null };
+        db.logs.push(entry);
+        const stoppedId = db.currentTimer.categoryId;
+        db.currentTimer = null;
+        saveAndSync();
+        renderDashboard();
+        checkReminder(stoppedId);
+    }
 
-                document.getElementById('prev-slide-btn').style.visibility = currentSlide === 0 ? 'hidden' : 'visible';
-                document.getElementById('next-slide-btn').style.visibility = currentSlide === slides.length - 1 ? 'hidden' : 'visible';
-            }
+    // ===== Render dashboard =====
+    function renderDashboard() {
+        const grid = document.getElementById('category-grid');
+        grid.querySelectorAll('.category-card').forEach(c=>c.remove());
+        const todayData = getAggregatedData(getLogsForPeriod('daily'));
+        let totalTodayMs = 0;
+        db.categories.forEach(cat => {
+            const catTimeMs = todayData[cat.id] || 0; totalTodayMs += catTimeMs;
+            const isRunning = db.currentTimer && db.currentTimer.categoryId===cat.id;
+            const card = document.createElement('div');
+            card.className = `category-card flex flex-col items-center justify-center bg-white p-6 rounded-lg shadow transition transform hover:scale-105 ${isRunning? 'ring-2 ring-brand-blue-500':''}`;
+            card.innerHTML = `
+                <span class="text-5xl mb-3">${cat.icon}</span>
+                <span class="font-semibold text-lg">${cat.name}</span>
+                <span class="text-gray-500 mb-4">${formatTime(catTimeMs)}</span>
+                <button class="timer-toggle-btn w-full px-4 py-2 rounded-lg font-medium transition ${isRunning ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-brand-blue-500 text-white hover:bg-brand-blue-600'}" data-id="${cat.id}">${isRunning ? 'Stop' : 'Start'}</button>
+            `;
+            grid.insertBefore(card, document.getElementById('add-category-btn'));
+        });
+        grid.querySelectorAll('.timer-toggle-btn').forEach(btn => btn.addEventListener('click', e => handleTimerToggle(parseInt(e.target.dataset.id))));
+        updateProgressWheel(totalTodayMs);
+    }
 
-            function setupOnboardingListeners() {
-                document.getElementById('next-slide-btn').addEventListener('click', () => {
-                    if (currentSlide < slides.length - 1) {
-                        currentSlide++;
-                        updateOnboardingUI();
-                    }
-                });
-                
-                document.getElementById('prev-slide-btn').addEventListener('click', () => {
-                    if (currentSlide > 0) {
-                        currentSlide--;
-                        updateOnboardingUI();
-                    }
-                });
-                
-                document.getElementById('start-balance-btn').addEventListener('click', () => {
-                    db.firstTime = false;
-                    saveDatabase();
-                    
-                    const onboardingPage = document.getElementById('onboarding-page');
-                    onboardingPage.style.transition = 'opacity 0.5s ease';
-                    onboardingPage.style.opacity = '0';
-                    
-                    setTimeout(() => {
-                        onboardingPage.style.display = 'none';
-                        document.getElementById('app-container').style.display = 'block';
-                        setupApp();
-                    }, 500);
-                });
-            }
+    function updateRealTimeUI() {
+        if (!db.currentTimer) { document.getElementById('current-timer-display').textContent=''; return; }
+        const runningMs = Date.now() - db.currentTimer.startTime;
+        const category = db.categories.find(c=>c.id===db.currentTimer.categoryId);
+        const descriptionText = db.currentTimer.description ? `: ${db.currentTimer.description}` : '';
+        document.getElementById('current-timer-display').textContent = `Melacak ${category.name}${descriptionText} (${formatTime(runningMs)})`;
+        const todayData = getAggregatedData(getLogsForPeriod('daily'));
+        let totalTodayMs = 0; Object.values(todayData).forEach(v=> totalTodayMs += v);
+        totalTodayMs += runningMs;
+        updateProgressWheel(totalTodayMs);
+        const activeCard = document.querySelector(`.timer-toggle-btn[data-id="${category.id}"]`);
+        if (activeCard) {
+            const totalCatTimeMs = (todayData[category.id] || 0) + runningMs;
+            activeCard.previousElementSibling.textContent = `${formatTime(totalCatTimeMs)}`;
+        }
+    }
+    function updateProgressWheel(totalMs) {
+        const totalHours = totalMs / 3600000;
+        const percent = Math.min((totalHours / 24) * 100, 100);
+        const circle = document.getElementById('progress-ring-circle');
+        const radius = circle.r.baseVal.value;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (percent / 100) * circumference;
+        circle.style.strokeDashoffset = offset;
+        document.getElementById('total-hours-text').textContent = `${formatTime(totalMs)}`;
+    }
+    function startGlobalTimer() { if (currentTimerInterval) clearInterval(currentTimerInterval); currentTimerInterval = setInterval(updateRealTimeUI, 1000); }
 
-            // ===================================
-            // NAVIGASI
-            // ===================================
+    // ===== Stats & Chart =====
+    function setupStatsFilterListeners() {
+        document.querySelectorAll('.stats-filter-btn').forEach(btn => btn.addEventListener('click', (e)=>{
+            const period = e.target.dataset.period;
+            document.querySelectorAll('.stats-filter-btn').forEach(b => { b.classList.remove('bg-brand-blue-500','text-white'); b.classList.add('bg-white','text-gray-600','border');});
+            e.target.classList.add('bg-brand-blue-500','text-white'); e.target.classList.remove('bg-white','text-gray-600','border');
+            renderStatsPage(period);
+        }));
+    }
 
-            function setupNavListeners() {
-                document.querySelectorAll('.nav-link').forEach(link => {
-                    link.addEventListener('click', (e) => {
-                        showPage(e.target.dataset.page);
-                    });
-                });
-            }
+    function renderStatsPage(period='daily') {
+        const logs = getLogsForPeriod(period);
+        const data = getAggregatedData(logs);
+        renderStatsChart(data);
+        const targetContainer = document.getElementById('target-comparison');
+        const activityLogContainer = document.getElementById('activity-log-details');
+        if (period === 'daily') { targetContainer.style.display='block'; activityLogContainer.style.display='block'; renderTargetComparison(data); renderActivityLog(logs, data); }
+        else { targetContainer.style.display='none'; activityLogContainer.style.display='none'; }
+    }
 
-            // Dropdown logic
-            const profilePhoto = document.getElementById("profile-photo");
-            const dropdown = document.getElementById("profile-dropdown");
-
-            profilePhoto.addEventListener("click", () => {
-                dropdown.classList.toggle("hidden");
-            });
-
-            document.addEventListener("click", (e) => {
-                if (!profilePhoto.contains(e.target) && !dropdown.contains(e.target)) {
-                    dropdown.classList.add("hidden");
-                }
-            });
-
-
-            function showPage(pageId) {
-                // Sembunyikan semua halaman
-                document.querySelectorAll('.page-content').forEach(page => {
-                    page.style.display = 'none';
-                });
-
-                // Update style nav link
-                document.querySelectorAll('.nav-link').forEach(link => {
-                    link.classList.toggle('active', link.dataset.page === pageId);
-                });
-
-                // Tampilkan halaman yang diminta
-                const pageToShow = document.getElementById(`${pageId}-page`);
-                if (pageToShow) {
-                    pageToShow.style.display = 'block';
-                }
-
-                // Render konten spesifik halaman
-                if (pageId === 'dashboard') {
-                    renderDashboard();
-                } else if (pageId === 'statistik') {
-                    renderStatsPage('daily'); // Default harian
-                } else if (pageId === 'insight') {
-                    renderInsightPage();
-                }
-            }
-            
-            // ===================================
-            // MODAL
-            // ===================================
-
-            function setupModalListeners() {
-                document.querySelectorAll('.btn-cancel-modal').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        hideModal(btn.closest('.modal').id);
-                    });
-                });
-                
-                document.querySelectorAll('.modal').forEach(modal => {
-                    modal.addEventListener('click', (e) => {
-                        if (e.target === modal) {
-                            hideModal(modal.id);
-                        }
-                    });
-                });
-            }
-
-            function showModal(modalId) {
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    modal.classList.remove('hidden');
-                    setTimeout(() => {
-                        modal.classList.remove('opacity-0', '-translate-y-4');
-                        modal.querySelector('.modal-content').classList.remove('scale-95');
-                    }, 10);
-                }
-            }
-
-            function hideModal(modalId) {
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    modal.classList.add('opacity-0', '-translate-y-4');
-                    modal.querySelector('.modal-content').classList.add('scale-95');
-                    setTimeout(() => {
-                        modal.classList.add('hidden');
-                        // Reset form jika itu modal kategori
-                        if (modalId === 'add-category-modal') {
-                            document.getElementById('add-category-form').reset();
-                        }
-                    }, 300);
-                }
-            }
-            
-            // ===================================
-            // LOGIKA TIMER & KATEGORI
-            // ===================================
-
-            // Tombol Start/Stop pada Kategori
-            function handleTimerToggle(categoryId) {
-                // Jika timer yang diklik sedang berjalan, STOP
-                if (db.currentTimer && db.currentTimer.categoryId === categoryId) {
-                    stopCurrentTimer();
-                    return;
-                }
-
-                // Jika timer lain sedang berjalan, STOP dulu
-                if (db.currentTimer) {
-                    stopCurrentTimer();
-                }
-
-                // (UBAH) Logika start
-                // Kategori 1 (Tidur) langsung mulai
-                if (categoryId === 1) {
-                    startTimer(categoryId, null); // Tidur tidak perlu deskripsi
-                } else {
-                    // Kategori lain (Kerja, Pribadi, Kustom) tampilkan modal
-                    showTaskDescriptionModal(categoryId);
-                }
-            }
-            
-            // (BARU) Fungsi untuk menampilkan modal deskripsi
-            function showTaskDescriptionModal(categoryId) {
-                document.getElementById('task-category-id').value = categoryId;
-                const category = db.categories.find(c => c.id === categoryId);
-                const placeholder = category.id === 2 ? 'Contoh: Rapat Proyek' : 'Contoh: Olahraga';
-                
-                const input = document.getElementById('task-description');
-                input.placeholder = placeholder;
-                
-                showModal('task-description-modal');
-                setTimeout(() => input.focus(), 100); // Fokus ke input
-            }
-            
-            // (BARU) Handler untuk submit modal deskripsi
-            function handleStartTask(e) {
-                e.preventDefault();
-                const categoryId = parseInt(document.getElementById('task-category-id').value);
-                const description = document.getElementById('task-description').value || 'Tanpa Deskripsi';
-                
-                startTimer(categoryId, description);
-                
-                hideModal('task-description-modal');
-                document.getElementById('task-description-form').reset();
-            }
-
-            function startTimer(categoryId, description) {
-                // Jika ada timer lain, stop dulu (double check)
-                if (db.currentTimer) {
-                    stopCurrentTimer();
-                }
-
-                // Mulai timer baru
-                db.currentTimer = {
-                    categoryId: categoryId,
-                    startTime: Date.now(),
-                    description: description // (BARU) Simpan deskripsi
-                };
-                saveDatabase();
-                renderDashboard(); // Update UI
-                startGlobalTimer(); // Pastikan interval berjalan
-            }
-
-            function stopCurrentTimer() {
-                if (!db.currentTimer) return;
-
-                const logEntry = {
-                    categoryId: db.currentTimer.categoryId,
-                    startTime: db.currentTimer.startTime,
-                    endTime: Date.now(),
-                    description: db.currentTimer.description || null // (BARU) Simpan deskripsi ke log
-                };
-                db.logs.push(logEntry);
-                
-                const stoppedTimerCategoryId = db.currentTimer.categoryId;
-                db.currentTimer = null;
-                
-                saveDatabase();
-                renderDashboard(); // Update UI
-                
-                // Cek reminder
-                checkReminder(stoppedTimerCategoryId);
-            }
-
-            // (DIHAPUS) Handler untuk form tambah kategori
-        
-            // ===================================
-            // RENDER HALAMAN
-            // ===================================
-
-            function renderDashboard() {
-                const grid = document.getElementById('category-grid');
-                // Kosongkan grid kecuali tombol 'tambah'
-                grid.querySelectorAll('.category-card').forEach(card => card.remove());
-                
-                const todayData = getAggregatedData(getLogsForPeriod('daily'));
-                let totalTodayMs = 0;
-
-                db.categories.forEach(cat => {
-                    const catTimeMs = todayData[cat.id] || 0;
-                    totalTodayMs += catTimeMs;
-
-                    const isRunning = db.currentTimer && db.currentTimer.categoryId === cat.id;
-                    const card = document.createElement('div');
-                    card.className = `category-card flex flex-col items-center justify-center bg-white p-6 rounded-lg shadow transition transform hover:scale-105 ${isRunning ? 'ring-2 ring-brand-blue-500' : ''}`;
-                    
-                    card.innerHTML = `
-                        <span class="text-5xl mb-3">${cat.icon}</span>
-                        <span class="font-semibold text-lg">${cat.name}</span>
-                        <span class="text-gray-500 mb-4">${formatTime(catTimeMs)}</span>
-                        <button class="timer-toggle-btn w-full px-4 py-2 rounded-lg font-medium transition ${isRunning ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-brand-blue-500 text-white hover:bg-brand-blue-600'}" data-id="${cat.id}">
-                            ${isRunning ? 'Stop' : 'Start'}
-                        </button>
-                    `;
-                    
-                    // Sisipkan sebelum tombol 'tambah'
-                    grid.insertBefore(card, document.getElementById('add-category-btn'));
-                });
-                
-                // Tambah event listener ke tombol start/stop
-                grid.querySelectorAll('.timer-toggle-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        handleTimerToggle(parseInt(e.target.dataset.id));
-                    });
-                });
-
-                // Update Progress Wheel
-                updateProgressWheel(totalTodayMs);
-            }
-
-            // Fungsi untuk meng-update UI secara real-time
-            function updateRealTimeUI() {
-                if (!db.currentTimer) {
-                    document.getElementById('current-timer-display').textContent = '';
-                    return;
-                }
-
-                const runningMs = Date.now() - db.currentTimer.startTime;
-                const category = db.categories.find(c => c.id === db.currentTimer.categoryId);
-                
-                // Update text timer berjalan
-                const descriptionText = db.currentTimer.description ? `: ${db.currentTimer.description}` : '';
-                document.getElementById('current-timer-display').textContent = 
-                    `Melacak ${category.name}${descriptionText} (${formatTime(runningMs)})`;
-
-                // Update total di dashboard
-                const todayData = getAggregatedData(getLogsForPeriod('daily'));
-                let totalTodayMs = 0;
-                Object.values(todayData).forEach(val => totalTodayMs += val);
-                
-                // Tambahkan waktu timer yang sedang berjalan
-                totalTodayMs += runningMs;
-
-                updateProgressWheel(totalTodayMs);
-                
-                // Update juga total jam di card yang sedang aktif
-                const activeCard = document.querySelector(`.timer-toggle-btn[data-id="${category.id}"]`);
-                if (activeCard) {
-                    const totalCatTimeMs = (todayData[category.id] || 0) + runningMs;
-                    activeCard.previousElementSibling.textContent = `${formatTime(totalCatTimeMs)}`;
-                }
-            }
-
-            function updateProgressWheel(totalMs) {
-                const totalHours = totalMs / 3600000; // ms ke jam
-                const percent = Math.min((totalHours / 24) * 100, 100);
-                
-                const circle = document.getElementById('progress-ring-circle');
-                const radius = circle.r.baseVal.value;
-                const circumference = 2 * Math.PI * radius;
-                const offset = circumference - (percent / 100) * circumference;
-
-                circle.style.strokeDashoffset = offset;
-                document.getElementById('total-hours-text').textContent = `${formatTime(totalMs)}`;
-            }
-
-            function startGlobalTimer() {
-                // Hentikan interval lama jika ada
-                if (currentTimerInterval) {
-                    clearInterval(currentTimerInterval);
-                }
-                // Mulai interval baru
-                currentTimerInterval = setInterval(updateRealTimeUI, 1000);
-            }
-
-            // ===================================
-            // HALAMAN STATISTIK
-            // ===================================
-            
-            function setupStatsFilterListeners() {
-                document.querySelectorAll('.stats-filter-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const period = e.target.dataset.period;
-                        
-                        // Update UI Tombol
-                        document.querySelectorAll('.stats-filter-btn').forEach(b => {
-                            b.classList.remove('bg-brand-blue-500', 'text-white');
-                            b.classList.add('bg-white', 'text-gray-600', 'border');
-                        });
-                        e.target.classList.add('bg-brand-blue-500', 'text-white');
-                        e.target.classList.remove('bg-white', 'text-gray-600', 'border');
-                        
-                        // Render ulang halaman
-                        renderStatsPage(period);
-                    });
-                });
-            }
-
-            function renderStatsPage(period = 'daily') {
-                const logs = getLogsForPeriod(period);
-                const data = getAggregatedData(logs);
-                
-                renderStatsChart(data);
-                
-                // (UBAH) Render perbandingan dan detail log
-                const targetContainer = document.getElementById('target-comparison');
-                const activityLogContainer = document.getElementById('activity-log-details'); // (BARU)
-                
-                if (period === 'daily') {
-                    targetContainer.style.display = 'block';
-                    activityLogContainer.style.display = 'block'; // (BARU)
-                    renderTargetComparison(data);
-                    renderActivityLog(logs, data); // (BARU)
-                } else {
-                    targetContainer.style.display = 'none';
-                    activityLogContainer.style.display = 'none'; // (BARU)
-                }
-            }
-
-            function renderStatsChart(data) {
-                const ctx = document.getElementById('stats-chart').getContext('2d');
-                
-                const labels = db.categories.map(c => c.name);
-                const chartData = db.categories.map(c => {
-                    return (data[c.id] || 0) / 3600000; // ke jam
-                });
-                // Tambahkan data total untuk perhitungan persentase
-                const totalHours = chartData.reduce((acc, val) => acc + val, 0);
-
-                // Hancurkan chart lama jika ada
-                if (statsChartInstance) {
-                    statsChartInstance.destroy();
-                }
-
-                statsChartInstance = new Chart(ctx, {
-                    type: 'pie', // UBAH: dari bar ke pie
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Total Jam',
-                            data: chartData,
-                            // UBAH: Tambahkan beberapa warna untuk pie chart
-                            backgroundColor: [
-                                '#0EA5E9', // brand-blue-500
-                                '#FACC15', // brand-yellow
-                                '#6B7280', // brand-gray
-                                '#EF4444', // red-500
-                                '#10B981', // green-500
-                                '#8B5CF6', // purple-500
-                            ],
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                display: true, // UBAH: Tampilkan legend
-                                position: 'top',
-                            },
-                            tooltip: {
-                                // UBAH: Kustomisasi tooltip untuk menampilkan persentase
-                                callbacks: {
-                                    label: function(context) {
-                                        const label = context.label || '';
-                                        const value = context.raw || 0;
-                                        const percentage = totalHours > 0 ? ((value / totalHours) * 100).toFixed(1) : 0;
-                                        return `${label}: ${value.toFixed(1)} jam (${percentage}%)`;
-                                    }
-                                }
+    function renderStatsChart(data) {
+        const ctx = document.getElementById('stats-chart').getContext('2d');
+        const labels = db.categories.map(c => c.name);
+        const chartData = db.categories.map(c => (data[c.id]||0)/3600000);
+        const totalHours = chartData.reduce((a,b)=>a+b,0);
+        if (statsChartInstance) statsChartInstance.destroy();
+        statsChartInstance = new Chart(ctx, {
+            type: 'pie',
+            data: { labels, datasets: [{ label: 'Total Jam', data: chartData, backgroundColor: ['#0EA5E9','#FACC15','#6B7280','#EF4444','#10B981','#8B5CF6'], borderWidth:1 }]},
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || ''; const value = context.raw || 0;
+                                const percentage = totalHours > 0 ? ((value / totalHours)*100).toFixed(1) : 0;
+                                return `${label}: ${value.toFixed(1)} jam (${percentage}%)`;
                             }
                         }
-                        // UBAH: Hapus scales, tidak perlu untuk pie chart
                     }
-                });
-            }
-            
-            // (BARU) Blok HTML untuk Detail Aktivitas
-            const activityLogDiv = document.createElement('div');
-            activityLogDiv.innerHTML = `
-                <h3 class="text-xl font-semibold mb-4 mt-8">Detail Aktivitas (Hari Ini)</h3>
-                <div id="activity-log-details" class="space-y-6">
-                    <!-- Detail log akan di-render oleh JS -->
-                </div>
-            `;
-            document.getElementById('statistik-page').appendChild(activityLogDiv);
-            
-            // (BARU) Fungsi untuk render detail log aktivitas
-            function renderActivityLog(logs, categoryData) {
-                const container = document.getElementById('activity-log-details');
-                container.innerHTML = ''; // Kosongkan
-
-                // Hanya proses kategori yang punya deskripsi (misal, bukan Tidur)
-                const categoriesToDetail = db.categories.filter(c => c.id !== 1); 
-
-                categoriesToDetail.forEach(cat => {
-                    const categoryLogs = logs.filter(log => log.categoryId === cat.id);
-                    if (categoryLogs.length === 0) return; // Lewati jika tidak ada log
-
-                    // Agregasi log berdasarkan deskripsi
-                    const groupedByDesc = {};
-                    categoryLogs.forEach(log => {
-                        const desc = log.description || 'Tanpa Deskripsi';
-                        const duration = log.endTime - log.startTime;
-                        if (!groupedByDesc[desc]) {
-                            groupedByDesc[desc] = 0;
-                        }
-                        groupedByDesc[desc] += duration;
-                    });
-                    
-                    // Buat elemen HTML
-                    const categoryTotalMs = categoryData[cat.id] || 0;
-                    let categoryHtml = `
-                        <div class="bg-white p-4 rounded-lg shadow">
-                            <div class="flex justify-between items-center mb-3">
-                                <h4 class="font-semibold text-lg">${cat.icon} ${cat.name}</h4>
-                                <span class="font-bold text-gray-800">${formatTime(categoryTotalMs)}</span>
-                            </div>
-                            <div class="space-y-2 pl-4 border-l-2 border-gray-200">
-                    `;
-                    
-                    // Urutkan deskripsi berdasarkan waktu terbanyak
-                    const sortedDescriptions = Object.entries(groupedByDesc).sort((a, b) => b[1] - a[1]);
-
-                    sortedDescriptions.forEach(([description, totalMs]) => {
-                        categoryHtml += `
-                            <div class="flex justify-between items-center text-sm">
-                                <span class="text-gray-600">${description}</span>
-                                <span class="font-medium text-gray-700">${formatTime(totalMs)}</span>
-                            </div>
-                        `;
-                    });
-
-                    categoryHtml += `</div></div>`;
-                    container.innerHTML += categoryHtml;
-                });
-                
-                if (container.innerHTML === '') {
-                    container.innerHTML = '<p class="text-gray-500 text-center">Belum ada detail aktivitas kerja atau pribadi hari ini.</p>';
                 }
             }
-
-            function renderTargetComparison(todayData) {
-                const container = document.getElementById('target-comparison');
-                container.innerHTML = ''; // Kosongkan
-                
-                const targetCategories = db.categories.filter(c => c.target);
-                
-                targetCategories.forEach(cat => {
-                    const actualHours = (todayData[cat.id] || 0) / 3600000;
-                    const targetHours = cat.target;
-                    const diff = actualHours - targetHours;
-                    
-                    let colorClass, diffText;
-                    if (Math.abs(diff) < 0.25) { // Toleransi 15 menit
-                        colorClass = 'bg-brand-blue-500'; // Biru - Seimbang
-                        diffText = "Seimbang";
-                    } else if (diff > 0) {
-                        colorClass = 'bg-brand-yellow'; // Kuning - Kelebihan
-                        diffText = `+${formatTime(diff * 3600000)}`;
-                    } else {
-                        colorClass = 'bg-brand-gray'; // Abu - Kekurangan
-                        diffText = `${formatTime(diff * 3600000)}`;
-                    }
-                    
-                    const element = document.createElement('div');
-                    element.className = 'bg-white p-4 rounded-lg shadow';
-                    element.innerHTML = `
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="font-semibold text-lg">${cat.icon} ${cat.name}</span>
-                            <span class="font-bold px-2 py-0.5 rounded text-sm ${diff > 0 ? 'text-yellow-800 bg-yellow-100' : 'text-gray-800 bg-gray-100'}">${diffText}</span>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div class="${colorClass} h-2.5 rounded-full" style="width: ${Math.min((actualHours / targetHours) * 100, 150)}%"></div>
-                            </div>
-                            <span class="text-sm font-medium text-gray-600 w-24 text-right">${formatTime(actualHours * 3600000)} / ${targetHours} jam</span>
-                        </div>
-                    `;
-                    container.appendChild(element);
-                });
-            }
-
-            // ===================================
-            // HALAMAN INSIGHT
-            // ===================================
-
-            function renderInsightPage() {
-                const todayData = getAggregatedData(getLogsForPeriod('daily'));
-                const sleepHours = (todayData[1] || 0) / 3600000; // ID 1 = Tidur
-                const workHours = (todayData[2] || 0) / 3600000; // ID 2 = Kerja
-                const personalHours = (todayData[3] || 0) / 3600000; // ID 3 = Pribadi
-
-                let insight = "Kamu seimbang hari ini — pertahankan pola 8–8–8!";
-
-                if (sleepHours < 7 && sleepHours > 0) {
-                    insight = "Tidurmu kurang semalam 😴 — coba tidur lebih awal malam ini.";
-                } else if (workHours > 9) {
-                    insight = "Waktu kerjamu sudah lebih dari ideal. Nikmati waktu pribadi sekarang!";
-                } else if (workHours > 0 && workHours < 6) {
-                    insight = "Kerja bagus! Jangan lupa alokasikan waktu untuk istirahat dan aktivitas pribadi ya.";
-                } else if (personalHours < 4 && personalHours > 0) {
-                    insight = "Jangan lupakan waktu pribadimu! Luangkan waktu untuk hobi atau bersantai.";
-                } else if (sleepHours === 0 && workHours === 0 && personalHours === 0) {
-                    insight = "Belum ada aktivitas tercatat hari ini. Mulai lacak waktumu untuk melihat insight!";
-                }
-
-                document.getElementById('insight-text').textContent = insight;
-            }
-            
-            // ===================================
-            // REMINDER OTOMATIS
-            // ===================================
-            
-            function checkReminder(categoryId) {
-                const category = db.categories.find(c => c.id === categoryId);
-                // Hanya cek kategori yang punya target (default 8-8-8)
-                if (!category || !category.target) return; 
-
-                const todayData = getAggregatedData(getLogsForPeriod('daily'));
-                const totalHours = (todayData[categoryId] || 0) / 3600000;
-
-                if (totalHours > category.target) {
-                    document.getElementById('reminder-text').textContent = 
-                        `Waktu ${category.name.toLowerCase()} Anda hari ini sudah lebih dari ${category.target} jam. Saatnya istirahat sejenak!`;
-                    showModal('reminder-modal');
-                }
-            }
-
-            // ===================================
-            // UTILITAS DATA & WAKTU
-            // ===================================
-
-            // Mendapat log untuk periode tertentu ('daily', 'weekly', 'monthly')
-            function getLogsForPeriod(period) {
-                const now = new Date();
-                let startTime;
-
-                switch (period) {
-                    case 'daily':
-                        startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-                        break;
-                    case 'weekly':
-                        const firstDayOfWeek = now.getDate() - now.getDay();
-                        startTime = new Date(now.getFullYear(), now.getMonth(), firstDayOfWeek).getTime();
-                        break;
-                    case 'monthly':
-                        startTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-                        break;
-                    default:
-                        startTime = 0;
-                }
-
-                return db.logs.filter(log => log.endTime >= startTime);
-            }
-
-            // Menjumlahkan log berdasarkan kategori
-            function getAggregatedData(logs) {
-                const data = {}; // { categoryId: totalMs }
-                logs.forEach(log => {
-                    const duration = log.endTime - log.startTime;
-                    if (!data[log.categoryId]) {
-                        data[log.categoryId] = 0;
-                    }
-                    data[log.categoryId] += duration;
-                });
-                return data;
-            }
-
-            // Format ms ke HH:MM:SS
-            function formatTime(ms) {
-                const absMs = Math.abs(ms); // Handle nilai negatif dari diff
-                const seconds = Math.floor((absMs / 1000) % 60);
-                const minutes = Math.floor((absMs / (1000 * 60)) % 60);
-                const hours = Math.floor((absMs / (1000 * 60 * 60)));
-                const sign = ms < 0 ? '-' : ''; // Tambahkan tanda minus jika perlu
-
-                return sign + [
-                    hours.toString().padStart(2, '0'),
-                    minutes.toString().padStart(2, '0'),
-                    seconds.toString().padStart(2, '0')
-                ].join(':');
-            }
-
-            // Format ms ke X.X jam
-            function formatHours(ms) {
-                if (!ms) return '0.0';
-                return (ms / 3600000).toFixed(1);
-            }
-
-            // ===================================
-            // MULAI APLIKASI
-            // ===================================
-            initializeApp();
-
         });
-    </script>
+    }
+
+    // ===== Activity log render + delete per entry =====
+    function renderActivityLog(logs, categoryData) {
+        const container = document.getElementById('activity-log-details'); container.innerHTML = '';
+        const categoriesToDetail = db.categories.filter(c=>c.id !== 1);
+        // build entries grouped by category and by description, but need individual delete
+        categoriesToDetail.forEach(cat => {
+            const categoryLogs = logs.filter(log => log.categoryId === cat.id);
+            if (categoryLogs.length === 0) return;
+            const categoryTotalMs = categoryData[cat.id] || 0;
+            let html = `<div class="bg-white p-4 rounded-lg shadow"><div class="flex justify-between items-center mb-3"><h4 class="font-semibold text-lg">${cat.icon} ${cat.name}</h4><span class="font-bold text-gray-800">${formatTime(categoryTotalMs)}</span></div><div class="space-y-2 pl-4 border-l-2 border-gray-200">`;
+            // show each entry with delete button
+            categoryLogs.forEach((log, idx) => {
+                // find original index in db.logs to delete by index
+                const originalIndex = db.logs.findIndex(l => l.startTime === log.startTime && l.endTime === log.endTime && l.categoryId === log.categoryId && (l.description||'') === (log.description||''));
+                html += `<div class="flex justify-between items-center text-sm"><div><div class="text-gray-600">${log.description || 'Tanpa Deskripsi'}</div><div class="text-xs text-gray-400">${new Date(log.startTime).toLocaleString()} - ${new Date(log.endTime).toLocaleTimeString()}</div></div><div class="flex items-center space-x-2"><div class="text-sm font-medium text-gray-700">${formatTime(log.endTime - log.startTime)}</div><button data-idx="${originalIndex}" class="delete-log-btn text-red-500 text-sm px-2 py-1 rounded hover:bg-red-50">Hapus</button></div></div>`;
+            });
+            html += `</div></div>`;
+            container.innerHTML += html;
+        });
+        // attach delete handlers
+        container.querySelectorAll('.delete-log-btn').forEach(b => b.addEventListener('click',(e)=>{
+            const idx = parseInt(e.target.dataset.idx);
+            if (!isNaN(idx) && idx >= 0) {
+                db.logs.splice(idx, 1);
+                saveAndSync();
+                renderStatsPage('daily'); // re-render
+            }
+        }));
+        if (container.innerHTML === '') container.innerHTML = '<p class="text-gray-500 text-center">Belum ada detail aktivitas kerja atau pribadi hari ini.</p>';
+    }
+
+    function renderTargetComparison(todayData) {
+        const container = document.getElementById('target-comparison'); container.innerHTML='';
+        const targetCategories = db.categories.filter(c => c.target);
+        targetCategories.forEach(cat => {
+            const actualHours = (todayData[cat.id]||0)/3600000; const targetHours = cat.target; const diff = actualHours - targetHours;
+            let colorClass = Math.abs(diff) < 0.25 ? 'bg-brand-blue-500' : (diff>0 ? 'bg-brand-yellow' : 'bg-brand-gray');
+            const element = document.createElement('div'); element.className='bg-white p-4 rounded-lg shadow';
+            element.innerHTML = `<div class="flex items-center justify-between mb-2"><span class="font-semibold text-lg">${cat.icon} ${cat.name}</span><span class="font-bold px-2 py-0.5 rounded text-sm ${diff>0 ? 'text-yellow-800 bg-yellow-100' : 'text-gray-800 bg-gray-100'}">${diff>0? '+'+formatTime(diff*3600000): formatTime(diff*3600000)}</span></div><div class="flex items-center space-x-2"><div class="w-full bg-gray-200 rounded-full h-2.5"><div class="${colorClass} h-2.5 rounded-full" style="width: ${Math.min((actualHours/targetHours)*100,150)}%"></div></div><span class="text-sm font-medium text-gray-600 w-24 text-right">${formatTime(actualHours*3600000)} / ${targetHours} jam</span></div>`;
+            container.appendChild(element);
+        });
+    }
+
+    // ===== Insight & reminder =====
+    function renderInsightPage() {
+        const todayData = getAggregatedData(getLogsForPeriod('daily'));
+        const sleepHours = (todayData[1]||0)/3600000, workHours=(todayData[2]||0)/3600000, personalHours=(todayData[3]||0)/3600000;
+        let insight = "Kamu seimbang hari ini — pertahankan pola 8–8–8!";
+        if (sleepHours < 7 && sleepHours > 0) insight = "Tidurmu kurang semalam 😴 — coba tidur lebih awal malam ini.";
+        else if (workHours > 9) insight = "Waktu kerjamu sudah lebih dari ideal. Nikmati waktu pribadi sekarang!";
+        else if (workHours > 0 && workHours < 6) insight = "Kerja bagus! Jangan lupa alokasikan waktu untuk istirahat dan aktivitas pribadi ya.";
+        else if (personalHours < 4 && personalHours > 0) insight = "Jangan lupakan waktu pribadimu! Luangkan waktu untuk hobi atau bersantai.";
+        else if (sleepHours === 0 && workHours === 0 && personalHours === 0) insight = "Belum ada aktivitas tercatat hari ini. Mulai lacak waktumu untuk melihat insight!";
+        document.getElementById('insight-text').textContent = insight;
+    }
+    function checkReminder(categoryId) {
+        const category = db.categories.find(c => c.id === categoryId); if (!category || !category.target) return;
+        const todayData = getAggregatedData(getLogsForPeriod('daily')); const totalHours = (todayData[categoryId]||0)/3600000;
+        if (totalHours > category.target) { document.getElementById('reminder-text').textContent = `Waktu ${category.name.toLowerCase()} Anda hari ini sudah lebih dari ${category.target} jam. Saatnya istirahat sejenak!`; showModal('reminder-modal'); }
+    }
+
+    // ===== util =====
+    function getLogsForPeriod(period) {
+        const now = new Date(); let startTime;
+        switch(period) {
+            case 'daily': startTime = new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(); break;
+            case 'weekly': const firstDayOfWeek = now.getDate()-now.getDay(); startTime = new Date(now.getFullYear(),now.getMonth(),firstDayOfWeek).getTime(); break;
+            case 'monthly': startTime = new Date(now.getFullYear(),now.getMonth(),1).getTime(); break;
+            default: startTime = 0;
+        }
+        return db.logs.filter(log => log.endTime >= startTime);
+    }
+    function getAggregatedData(logs) {
+        const out = {}; logs.forEach(log => { const dur = log.endTime - log.startTime; out[log.categoryId] = (out[log.categoryId] || 0) + dur; }); return out;
+    }
+    function formatTime(ms) { const absMs=Math.abs(ms); const s=Math.floor((absMs/1000)%60); const m=Math.floor((absMs/(1000*60))%60); const h=Math.floor((absMs/(1000*60*60))); const sign= ms<0?'-':''; return sign + [h.toString().padStart(2,'0'), m.toString().padStart(2,'0'), s.toString().padStart(2,'0')].join(':'); }
+
+    // ===== Profile dropdown & avatar chooser =====
+    const profilePhoto = document.getElementById('profile-photo');
+    const profileDropdown = document.getElementById('profile-dropdown');
+    profilePhoto.addEventListener('click', ()=> profileDropdown.classList.toggle('hidden'));
+    document.addEventListener('click', (e)=> { if (!profilePhoto.contains(e.target) && !profileDropdown.contains(e.target)) profileDropdown.classList.add('hidden'); });
+
+    // avatar modal populate
+    const avatarOptionsDiv = document.getElementById('avatar-options');
+    avatarSeeds.forEach(seed => {
+        const img = document.createElement('img');
+        img.src = `https://api.dicebear.com/6.x/thumbs/svg?seed=${seed}`;
+        img.className = 'w-20 h-20 rounded cursor-pointer border';
+        img.addEventListener('click', async ()=> {
+            // set chosen avatar locally & save/sync
+            db.chosenAvatar = img.src;
+            profilePhoto.src = db.chosenAvatar;
+            hideModal('avatar-modal');
+            await saveAndSync();
+        });
+        avatarOptionsDiv.appendChild(img);
+    });
+    document.getElementById('choose-avatar-btn').addEventListener('click', ()=> showModal('avatar-modal'));
+    document.getElementById('close-avatar-modal').addEventListener('click', ()=> hideModal('avatar-modal'));
+
+    // ===== Firebase login/logout =====
+    document.getElementById('login-btn').addEventListener('click', async ()=> {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        try { await auth.signInWithPopup(provider); } catch(e){ console.error(e); alert('Login gagal: '+(e.message||e)); }
+    });
+    document.getElementById('logout-btn').addEventListener('click', ()=> auth.signOut());
+
+    // auth state change: load remote db if exists, else push local
+    auth.onAuthStateChanged(async (user) => {
+        const loginBtn = document.getElementById('login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const profileName = document.getElementById('profile-name');
+
+        if (user) {
+            // Update UI
+            loginBtn.classList.add('hidden'); logoutBtn.classList.remove('hidden');
+            profileName.textContent = user.displayName || user.email || 'User';
+            // Load remote DB (if exists)
+            const remote = await loadUserDBFromFirestore(user.uid);
+            if (remote) {
+                // Merge remote into local but keep local currentTimer if running on this device
+                const keepCurrentTimer = db && db.currentTimer;
+                db = remote;
+                if (keepCurrentTimer) db.currentTimer = keepCurrentTimer;
+                saveDatabaseLocal();
+            } else {
+                // if no remote, push local to Firestore
+                if (!db) db = defaultDB();
+                await saveUserDBToFirestore(user.uid);
+            }
+            // if user has no chosenAvatar, assign random
+            if (!db.chosenAvatar) {
+                const seed = avatarSeeds[Math.floor(Math.random()*avatarSeeds.length)];
+                db.chosenAvatar = `https://api.dicebear.com/6.x/thumbs/svg?seed=${seed}`;
+                await saveAndSync();
+            }
+            profilePhoto.src = db.chosenAvatar || (user.photoURL || `https://api.dicebear.com/6.x/thumbs/svg?seed=${encodeURIComponent(user.uid)}`);
+            // render app state
+            document.getElementById('onboarding-page').style.display='none';
+            document.getElementById('app-container').style.display='block';
+            setupApp(); renderDashboard();
+        } else {
+            // logged out UI
+            loginBtn.classList.remove('hidden'); logoutBtn.classList.add('hidden');
+            profileName.textContent = 'Not signed in';
+            // use local DB only
+            db = db || loadDatabaseLocal();
+            profilePhoto.src = db.chosenAvatar || `https://api.dicebear.com/6.x/thumbs/svg?seed=${avatarSeeds[Math.floor(Math.random()*avatarSeeds.length)]}`;
+            if (db.firstTime) { document.getElementById('onboarding-page').style.display='flex'; document.getElementById('app-container').style.display='none'; updateOnboardingUI(); } else { document.getElementById('onboarding-page').style.display='none'; document.getElementById('app-container').style.display='block'; setupApp(); }
+        }
+    });
+
+    // save local and sync to firestore if logged in
+    async function saveAndSync() {
+        saveDatabaseLocal();
+        const u = auth.currentUser;
+        if (u) await saveUserDBToFirestore(u.uid);
+    }
+
+    // ===== delete history single item handled earlier in renderActivityLog =====
+
+    // ===== setup app =====
+    function setupApp() {
+        setupNavListeners();
+        setupModalListeners();
+        setupStatsFilterListeners();
+        document.getElementById('add-category-btn').addEventListener('click', ()=> alert('Fitur tambah kategori belum diimplementasikan di versi ini.'));
+        document.querySelectorAll('.btn-cancel-modal').forEach(btn => btn.addEventListener('click', (e)=> hideModal(e.target.closest('.modal').id)));
+        startGlobalTimer();
+        showPage('dashboard');
+    }
+
+    // ===== initial load =====
+    // load local db first
+    db = loadDatabaseLocal();
+
+    // ensure app visible state consistent with db.firstTime
+    if (!db.firstTime) {
+        document.getElementById('onboarding-page').style.display='none';
+        document.getElementById('app-container').style.display='block';
+    } else {
+        document.getElementById('onboarding-page').style.display='flex';
+        document.getElementById('app-container').style.display='none';
+    }
+
+    // call setup listeners that don't need auth
+    setupOnboardingUI(); // ensure dots/slides updated
+    function setupOnboardingUI(){ updateOnboardingUI(); }
+
+    // Setup stats canvas sizing (smaller circle)
+    // Chart will be initialized when statistik page is shown
+
+    // expose some dev helpers (optional)
+    window._eightify = { getDB: ()=>db, saveAndSync };
+
+}); // DOMContentLoaded end
+</script>
 
 </body>
 </html>
