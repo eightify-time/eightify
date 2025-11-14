@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circles - Eightify</title>
+    
+    <link rel="stylesheet" href="css/style.css">
+    
+    <style>
+        /* CSS ini HANYA untuk halaman circle */
+        .circle-view {
+            display: none; /* Sembunyikan semua view by default */
+        }
+        .circle-view.active {
+            display: block; /* Tampilkan yang aktif */
+        }
+
+        .form-section {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+        }
+        
+        .form-section h2 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin-bottom: 1rem;
+        }
+
+        .form-button {
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: var(--productive-color);
+            color: #fff;
+        }
+        .form-button:hover {
+            opacity: 0.9;
+        }
+        
+        #circle-loading {
+            text-align: center;
+            font-size: 1.2rem;
+            padding: 2rem;
+        }
+        
+        /* Dashboard Circle (Placeholder Baru) */
+        .circle-header {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        .circle-header h1 {
+             margin-bottom: 0.5rem;
+        }
+        .circle-invite-code {
+            font-size: 1.1rem;
+            font-weight: 600;
+            background: var(--bg-color);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="index.html" style="text-decoration: none; font-size: 1.2rem; color: var(--text-color); padding: 0.5rem;">&larr; Kembali ke Dashboard</a>
+    </nav>
+
+    <main class="main-dashboard">
+        
+        <div id="stats-login-warning">
+            <p>Silakan <a href="index.html">login</a> untuk menggunakan fitur Circles.</p>
+        </div>
+
+        <div id="circle-loading" class="circle-view active">
+            <p>Memeriksa status circle Anda...</p>
+        </div>
+
+        <div id="circle-join-create-view" class="circle-view">
+            
+            <section class="form-section">
+                <h2>Buat Circle Baru</h2>
+                <label for="circle-name-input">Nama Circle:</label>
+                <input type="text" id="circle-name-input" class="form-input" placeholder="Misal: Tim Produktif 🚀">
+                <button id="create-circle-btn" class="form-button">Buat Circle</button>
+            </section>
+            
+            <hr style="margin: 2rem 0; border: 1px solid var(--border-color);">
+
+            <section class="form-section">
+                <h2>Gabung Circle</h2>
+                <label for="circle-code-input">Kode Undangan:</label>
+                <input type="text" id="circle-code-input" class="form-input" placeholder="Masukkan kode 6 digit">
+                <button id="join-circle-btn" class="form-button">Gabung</button>
+            </section>
+
+        </div>
+
+        <div id="circle-dashboard-view" class="circle-view">
+            <div class="circle-header">
+                <h1 id="circle-name-display">Nama Circle Anda</h1>
+                <p>Bagikan kode ini untuk mengundang teman:</p>
+                <div class="circle-invite-code" id="circle-invite-display"> memuat... </div>
+            </div>
+            
+            <div class="placeholder-content" style="text-align: center; padding: 3rem; background: var(--card-bg); border-radius: 12px; margin-top: 2rem;">
+                <h2>Selamat Datang di Circle Anda!</h2>
+                <p>Fitur leaderboard dan feed aktivitas akan segera muncul di sini.</p>
+            </div>
+        </div>
+        
+    </main>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <script src="js/firebase.js"></script>
+    
+    <script src="js/circle.js"></script>
+
+</body>
+</html>
