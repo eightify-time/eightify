@@ -442,4 +442,246 @@ body.dark-mode .guest-warning {
     .main-dashboard {
         padding: 0.5rem 1rem;
     }
+
+}
+
+/* --- Tambahan Gaya untuk Halaman Circle --- */
+
+.circle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.circle-header h1 {
+    margin: 0;
+    color: var(--text-dark);
+}
+
+.circle-header p {
+    margin: 0;
+    color: var(--text-light);
+}
+
+.invite-btn {
+    padding: 10px 20px;
+    background: var(--primary-blue);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.invite-btn:hover {
+    background: #3A7BC8;
+}
+
+.circle-main-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.circle-members-section {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 30px;
+    box-shadow: 0 2px 10px var(--shadow);
+}
+
+.circle-members-section h2,
+.leaderboard-card h2,
+.activity-feed-card h2 {
+    margin: 0 0 5px 0;
+    color: var(--text-dark);
+}
+
+.circle-members-section > p,
+.leaderboard-card > p,
+.activity-feed-card > p {
+    margin: 0 0 20px 0;
+    color: var(--text-light);
+    font-size: 14px;
+}
+
+.circle-members-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+
+.member-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.member-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.member-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: var(--text-dark);
+    overflow: hidden;
+}
+
+.member-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.member-name {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.member-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.stat-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
+
+.stat-row span:first-child {
+    width: 70px;
+    color: var(--text-light);
+}
+
+.stat-bar-container {
+    flex: 1;
+    height: 10px;
+    background: var(--empty);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.stat-bar {
+    height: 100%;
+    border-radius: 5px;
+}
+
+.stat-bar.productive { background: var(--productive); }
+.stat-bar.personal { background: var(--personal); }
+.stat-bar.sleep { background: var(--sleep); }
+
+.stat-hours {
+    width: 40px;
+    text-align: right;
+    font-weight: 500;
+    color: var(--text-dark);
+}
+
+.leaderboard-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 30px;
+    box-shadow: 0 2px 10px var(--shadow);
+    align-self: start; /* Mencegahnya meregang */
+}
+
+.leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.leaderboard-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.leaderboard-rank {
+    width: 25px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-light);
+}
+
+.member-avatar.small {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+}
+
+.leaderboard-hours {
+    margin-left: auto;
+    font-weight: 600;
+    color: var(--primary-blue);
+}
+
+.activity-feed-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 30px;
+    box-shadow: 0 2px 10px var(--shadow);
+}
+
+.activity-feed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.feed-item {
+    display: flex;
+    gap: 15px;
+    padding: 15px 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.feed-item:last-child {
+    border-bottom: none;
+}
+
+.feed-icon {
+    font-size: 16px;
+    color: var(--success);
+    margin-top: 2px;
+}
+
+.feed-content p {
+    margin: 0;
+    font-size: 15px;
+}
+.feed-content p em {
+    color: var(--text-light);
+    font-style: normal;
+}
+
+.feed-time {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 2px;
+}
+
+/* Responsif untuk Circle Page */
+@media (max-width: 900px) {
+    .circle-main-grid {
+        grid-template-columns: 1fr;
+    }
 }
